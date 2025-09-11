@@ -101,7 +101,6 @@ class TradingBot:
         client = self.twm.get_client()
         klines = client.get_historical_klines(self.symbol, self.timeframe, "1 day ago UTC")
         
-        # Limpa o dataframe antes de adicionar os novos dados
         self.rsi_strategy.dataframe = pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         
         for kline in klines:
@@ -116,7 +115,6 @@ class TradingBot:
             new_df = pd.DataFrame([new_row])
             self.rsi_strategy.dataframe = pd.concat([self.rsi_strategy.dataframe, new_df], ignore_index=True)
 
-        # Calcula o RSI para os dados históricos
         if len(self.rsi_strategy.dataframe) > self.rsi_period:
             self.rsi_strategy.dataframe = self.rsi_strategy.dataframe.astype({'close': 'float64'})
             rsi_indicator = ta.momentum.RSIIndicator(self.rsi_strategy.dataframe['close'], window=self.rsi_period)
