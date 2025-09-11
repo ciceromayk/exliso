@@ -1,3 +1,5 @@
+#app.py
+
 import streamlit as st
 import pandas as pd
 import time
@@ -38,7 +40,6 @@ if st.sidebar.button("Parar Bot"):
     st.session_state.bot.stop_bot()
     st.sidebar.warning("Bot parado.")
 
-
 # placeholders para dados em tempo real
 status_placeholder = st.empty()
 chart_placeholder = st.empty()
@@ -64,7 +65,7 @@ while True:
             'high': data['high'],
             'low': data['low'],
             'close': data['close'],
-            'volume': 0, # Volume não é fornecido por este stream, por isso colocamos 0.
+            'volume': data['volume'],
             'rsi': data['rsi']
         }
         new_df = pd.DataFrame([new_row])
@@ -106,11 +107,12 @@ while True:
             if current_rsi:
                 # Adiciona o RSI como um subplot
                 fig_rsi = go.Figure(data=,
-                    y=st.session_state.data_history['rsi'],
-                    mode='lines',
-                    name='RSI',
-                    line=dict(color='purple')
-                )])
+                        y=st.session_state.data_history['rsi'],
+                        mode='lines',
+                        name='RSI',
+                        line=dict(color='purple')
+                    )
+                ])
                 fig_rsi.update_layout(title="Indicador RSI")
                 st.plotly_chart(fig, use_container_width=True)
                 st.plotly_chart(fig_rsi, use_container_width=True)
