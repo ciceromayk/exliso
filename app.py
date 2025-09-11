@@ -91,28 +91,29 @@ while True:
 
         # Cria e atualiza o gráfico de candlestick
         with chart_placeholder:
-            fig = go.Figure(data=[go.Candlestick(
+            fig_candlestick = go.Figure(data=[go.Candlestick(
                 x=st.session_state.data_history['timestamp'],
                 open=st.session_state.data_history['open'],
                 high=st.session_state.data_history['high'],
                 low=st.session_state.data_history['low'],
                 close=st.session_state.data_history['close']
             )])
-            fig.update_layout(xaxis_rangeslider_visible=False, title=f"Preço de {symbol} - Timeframe: {timeframe}")
+            fig_candlestick.update_layout(xaxis_rangeslider_visible=False, title=f"Preço de {symbol} - Timeframe: {timeframe}")
             
-            # Adiciona o RSI como um subplot (com a sintaxe corrigida)
+            # Adiciona o RSI como um subplot (sintaxe corrigida)
             if 'rsi' in st.session_state.data_history.columns and not st.session_state.data_history['rsi'].isnull().all():
                 fig_rsi = go.Figure(data=,
-                    y=st.session_state.data_history['rsi'],
-                    mode='lines',
-                    name='RSI',
-                    line=dict(color='purple')
-                )])
-                fig_rsi.update_layout(title="Indicador RSI")
-                st.plotly_chart(fig, use_container_width=True)
+                        y=st.session_state.data_history['rsi'],
+                        mode='lines',
+                        name='RSI',
+                        line=dict(color='purple')
+                    )
+                ])
+                fig_rsi.update_layout(title="Indicador RSI", xaxis_rangeslider_visible=False)
+                st.plotly_chart(fig_candlestick, use_container_width=True)
                 st.plotly_chart(fig_rsi, use_container_width=True)
             else:
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig_candlestick, use_container_width=True)
 
     # Pequena pausa para evitar sobrecarga de CPU e controlar a frequência de atualização
     time.sleep(1)
