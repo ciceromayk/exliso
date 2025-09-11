@@ -40,6 +40,7 @@ if st.sidebar.button("Parar Bot"):
     st.session_state.bot.stop_bot()
     st.sidebar.warning("Bot parado.")
 
+
 # placeholders para dados em tempo real
 status_placeholder = st.empty()
 chart_placeholder = st.empty()
@@ -49,8 +50,6 @@ dataframe_placeholder = st.empty()
 
 # Dicionário para armazenar o histórico de dados para o gráfico
 if 'data_history' not in st.session_state:
-    st.session_state.data_history = pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'rsi'])
-    # Carrega dados históricos para preencher o gráfico inicial
     st.session_state.data_history = st.session_state.bot.get_historical_data()
 
 # Loop para atualização contínua do dashboard
@@ -104,15 +103,14 @@ while True:
             )])
             fig.update_layout(xaxis_rangeslider_visible=False, title=f"Preço de {symbol} - Timeframe: {timeframe}")
             
-            if current_rsi:
-                # Adiciona o RSI como um subplot
+            # Adiciona o RSI como um subplot (com a sintaxe corrigida)
+            if 'rsi' in st.session_state.data_history.columns and not st.session_state.data_history['rsi'].isnull().all():
                 fig_rsi = go.Figure(data=,
-                        y=st.session_state.data_history['rsi'],
-                        mode='lines',
-                        name='RSI',
-                        line=dict(color='purple')
-                    )
-                ])
+                    y=st.session_state.data_history['rsi'],
+                    mode='lines',
+                    name='RSI',
+                    line=dict(color='purple')
+                )])
                 fig_rsi.update_layout(title="Indicador RSI")
                 st.plotly_chart(fig, use_container_width=True)
                 st.plotly_chart(fig_rsi, use_container_width=True)
