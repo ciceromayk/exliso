@@ -3,7 +3,6 @@ import pandas as pd
 import time
 import plotly.graph_objects as go
 from bot_core import TradingBot
-import ta
 from datetime import datetime
 
 # Configurações iniciais do Streamlit
@@ -103,12 +102,11 @@ while True:
             # Adiciona o RSI como um subplot (sintaxe corrigida)
             if 'rsi' in st.session_state.data_history.columns and not st.session_state.data_history['rsi'].isnull().all():
                 fig_rsi = go.Figure(data=,
-                        y=st.session_state.data_history['rsi'],
-                        mode='lines',
-                        name='RSI',
-                        line=dict(color='purple')
-                    )
-                ])
+                    y=st.session_state.data_history['rsi'],
+                    mode='lines',
+                    name='RSI',
+                    line=dict(color='purple')
+                )])
                 fig_rsi.update_layout(title="Indicador RSI", xaxis_rangeslider_visible=False)
                 st.plotly_chart(fig_candlestick, use_container_width=True)
                 st.plotly_chart(fig_rsi, use_container_width=True)
