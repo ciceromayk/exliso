@@ -1,5 +1,3 @@
-#bot_core.py
-
 import os
 from dotenv import load_dotenv
 from binance import ThreadedWebsocketManager
