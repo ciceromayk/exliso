@@ -1,6 +1,6 @@
 python-binance
 python-dotenv
 pandas
-ta-lib==0.4.28
+ta-lib
 streamlit
 plotly
