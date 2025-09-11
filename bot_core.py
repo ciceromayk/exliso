@@ -29,7 +29,7 @@ class TradingBot:
             timeframe=self.timeframe,
             rsi_period=self.rsi_period,
             rsi_oversold=self.rsi_oversold,
-            rsi_overbought=self.rsi_overbought
+            rsi_overbought=self.rsi_oversold
         )
         self.historical_data_loaded = False
         self.running = False
@@ -108,9 +108,12 @@ class TradingBot:
         client = self.twm.get_client()
         klines = client.get_historical_klines(self.symbol, self.timeframe, "1 day ago UTC")
         
+        # Limpa o dataframe antes de adicionar os novos dados
+        self.rsi_strategy.dataframe = pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        
         for kline in klines:
             new_row = {
-                'timestamp': kline,
+                'timestamp': pd.to_datetime(kline, unit='ms'),
                 'open': float(kline[1]),
                 'high': float(kline[2]),
                 'low': float(kline[3]),
