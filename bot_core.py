@@ -60,11 +60,12 @@ class TradingBot:
 
                 # Coloca todos os dados importantes na fila para o Streamlit consumir
                 self.data_queue.put({
-                    'timestamp': kline,
+                    'timestamp': kline['t'],
                     'open': float(kline['o']),
                     'high': float(kline['h']),
                     'low': float(kline['l']),
                     'close': float(kline['c']),
+                    'volume': float(kline['v']),
                     'rsi': last_rsi,
                     'signal': signal
                 })
@@ -109,15 +110,21 @@ class TradingBot:
         
         for kline in klines:
             new_row = {
+                'timestamp': kline,
                 'open': float(kline[1]),
                 'high': float(kline[2]),
                 'low': float(kline[3]),
                 'close': float(kline[4]),
-                'volume': float(kline[5]),
-                'timestamp': kline
+                'volume': float(kline[5])
             }
             new_df = pd.DataFrame([new_row])
             self.rsi_strategy.dataframe = pd.concat([self.rsi_strategy.dataframe, new_df], ignore_index=True)
+
+        # Calcula o RSI para os dados históricos
+        if len(self.rsi_strategy.dataframe) > self.rsi_period:
+            self.rsi_strategy.dataframe = self.rsi_strategy.dataframe.astype({'close': 'float64'})
+            rsi_indicator = ta.momentum.RSIIndicator(self.rsi_strategy.dataframe['close'], window=self.rsi_period)
+            self.rsi_strategy.dataframe['rsi'] = rsi_indicator.rsi()
             
         self.historical_data_loaded = True
         return self.rsi_strategy.dataframe
