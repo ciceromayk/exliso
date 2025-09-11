@@ -42,12 +42,9 @@ class TradingBot:
             kline = msg['k']
             is_closed = kline['x']
             
-            # Adiciona os dados da vela fechada ao dataframe da estratégia
             self.rsi_strategy.add_kline(kline)
             
-            # Se a vela está fechada, avalia a estratégia e coloca o resultado na fila
             if is_closed:
-                # Calcula o RSI para exibir no dashboard
                 if len(self.rsi_strategy.dataframe) > self.rsi_period:
                     self.rsi_strategy.dataframe = self.rsi_strategy.dataframe.astype({'close': 'float64'})
                     rsi_indicator = ta.momentum.RSIIndicator(self.rsi_strategy.dataframe['close'], window=self.rsi_period)
@@ -56,9 +53,7 @@ class TradingBot:
                     last_rsi = None
 
                 signal = self.rsi_strategy.get_signal()
-                last_price = float(kline['c'])
-
-                # Coloca todos os dados importantes na fila para o Streamlit consumir
+                
                 self.data_queue.put({
                     'timestamp': kline['t'],
                     'open': float(kline['o']),
@@ -113,7 +108,7 @@ class TradingBot:
         
         for kline in klines:
             new_row = {
-                'timestamp': pd.to_datetime(kline, unit='ms'),
+                'timestamp': kline,
                 'open': float(kline[1]),
                 'high': float(kline[2]),
                 'low': float(kline[3]),
