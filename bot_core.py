@@ -1,124 +1,117 @@
-import os
-from dotenv import load_dotenv
-from binance import ThreadedWebsocketManager
+import streamlit as st
 import pandas as pd
-from strategies.rsi_strategy import RSIStrategy
-import queue
 import time
-import ta
+import plotly.graph_objects as go
+from bot_core import TradingBot
+from datetime import datetime
 
-# Carrega as variáveis de ambiente do arquivo.env
-load_dotenv()
-API_KEY = os.getenv("BINANCE_API_KEY")
-API_SECRET = os.getenv("BINANCE_API_SECRET")
+# Configurações iniciais do Streamlit
+st.set_page_config(layout="wide", page_title="Bot de Trading de Memecoins")
 
-class TradingBot:
-    def __init__(self, symbol, timeframe, rsi_period=14, rsi_oversold=30, rsi_overbought=70):
-        self.symbol = symbol
-        self.timeframe = timeframe
-        self.rsi_period = rsi_period
-        self.rsi_oversold = rsi_oversold
-        self.rsi_overbought = rsi_overbought
-        self.twm = ThreadedWebsocketManager(api_key=API_KEY, api_secret=API_SECRET)
-        self.twm.start()
-        self.data_queue = queue.Queue()
-        self.rsi_strategy = RSIStrategy(
-            symbol=self.symbol,
-            timeframe=self.timeframe,
-            rsi_period=self.rsi_period,
-            rsi_oversold=self.rsi_oversold,
-            rsi_overbought=self.rsi_oversold
-        )
-        self.historical_data_loaded = False
-        self.running = False
+# Título do dashboard
+st.title("Dashboard de Trading de Memecoins em Tempo Real")
 
-    def _handle_socket_message(self, msg):
-        """
-        Função de callback para processar mensagens do WebSocket.
-        """
-        if msg['e'] == 'kline':
-            kline = msg['k']
-            is_closed = kline['x']
+# Inicializa o bot na `Session State` do Streamlit para persistir o estado
+if 'bot' not in st.session_state:
+    st.session_state.bot = TradingBot(symbol='PEPEUSDT', timeframe='1m')
+
+# Sidebar para controles do bot
+st.sidebar.header("Controles do Bot")
+symbol = st.sidebar.selectbox(
+    "Selecione a Criptomoeda",
+    ('PEPEUSDT', 'DOGEUSDT', 'SHIBUSDT'),
+    key='symbol_select'
+)
+timeframe = st.sidebar.selectbox(
+    "Selecione o Timeframe",
+    ('1m', '5m', '15m'),
+    key='timeframe_select'
+)
+if st.sidebar.button("Iniciar Bot"):
+    st.session_state.bot.stop_bot()
+    st.session_state.bot = TradingBot(symbol=symbol, timeframe=timeframe)
+    st.session_state.bot.start_bot()
+    st.sidebar.success("Bot iniciado com sucesso!")
+
+if st.sidebar.button("Parar Bot"):
+    st.session_state.bot.stop_bot()
+    st.sidebar.warning("Bot parado.")
+
+
+# placeholders para dados em tempo real
+chart_placeholder = st.empty()
+metrics_placeholder = st.empty()
+signal_placeholder = st.empty()
+
+# Dicionário para armazenar o histórico de dados para o gráfico
+if 'data_history' not in st.session_state:
+    st.session_state.data_history = st.session_state.bot.get_historical_data()
+    st.session_state.data_history['timestamp'] = pd.to_datetime(st.session_state.data_history['timestamp'], unit='ms')
+
+# Loop para atualização contínua do dashboard
+while True:
+    data = st.session_state.bot.get_data()
+    
+    if data:
+        # Adiciona novos dados ao histórico
+        new_row = {
+            'timestamp': pd.to_datetime(data['timestamp'], unit='ms'),
+            'open': data['open'],
+            'high': data['high'],
+            'low': data['low'],
+            'close': data['close'],
+            'volume': data['volume'],
+            'rsi': data['rsi']
+        }
+        new_df = pd.DataFrame([new_row])
+        st.session_state.data_history = pd.concat([st.session_state.data_history, new_df], ignore_index=True)
+
+        # Limita o tamanho do histórico para economizar memória e manter o gráfico rápido
+        st.session_state.data_history = st.session_state.data_history.iloc[-500:]
+
+        # Lógica de exibição das métricas e sinais
+        current_price = data['close']
+        current_rsi = data['rsi']
+        signal = data['signal']
+
+        # Atualiza os placeholders
+        with metrics_placeholder.container():
+            col1, col2 = st.columns(2)
+            col1.metric("Preço Atual", f"{current_price:.6f} USDT")
+            col2.metric("RSI (14)", f"{current_rsi:.2f}" if current_rsi else "Calculando...")
+        
+        with signal_placeholder.container():
+            if signal == "BUY":
+                st.success(f"SINAL DETECTADO: {signal} em {symbol}")
+            elif signal == "SELL":
+                st.error(f"SINAL DETECTADO: {signal} em {symbol}")
+            else:
+                st.info(f"SINAL: {signal}")
+
+        # Cria e atualiza o gráfico de candlestick
+        with chart_placeholder:
+            fig_candlestick = go.Figure(data=[go.Candlestick(
+                x=st.session_state.data_history['timestamp'],
+                open=st.session_state.data_history['open'],
+                high=st.session_state.data_history['high'],
+                low=st.session_state.data_history['low'],
+                close=st.session_state.data_history['close']
+            )])
+            fig_candlestick.update_layout(xaxis_rangeslider_visible=False, title=f"Preço de {symbol} - Timeframe: {timeframe}")
             
-            self.rsi_strategy.add_kline(kline)
-            
-            if is_closed:
-                if len(self.rsi_strategy.dataframe) > self.rsi_period:
-                    self.rsi_strategy.dataframe = self.rsi_strategy.dataframe.astype({'close': 'float64'})
-                    rsi_indicator = ta.momentum.RSIIndicator(self.rsi_strategy.dataframe['close'], window=self.rsi_period)
-                    last_rsi = rsi_indicator.rsi().iloc[-1]
-                else:
-                    last_rsi = None
+            # Adiciona o RSI como um subplot (sintaxe corrigida)
+            if 'rsi' in st.session_state.data_history.columns and not st.session_state.data_history['rsi'].isnull().all():
+                fig_rsi = go.Figure(data=,
+                    y=st.session_state.data_history['rsi'],
+                    mode='lines',
+                    name='RSI',
+                    line=dict(color='purple')
+                )])
+                fig_rsi.update_layout(title="Indicador RSI", xaxis_rangeslider_visible=False)
+                st.plotly_chart(fig_candlestick, use_container_width=True)
+                st.plotly_chart(fig_rsi, use_container_width=True)
+            else:
+                st.plotly_chart(fig_candlestick, use_container_width=True)
 
-                signal = self.rsi_strategy.get_signal()
-                
-                self.data_queue.put({
-                    'timestamp': kline['t'],
-                    'open': float(kline['o']),
-                    'high': float(kline['h']),
-                    'low': float(kline['l']),
-                    'close': float(kline['c']),
-                    'volume': float(kline['v']),
-                    'rsi': last_rsi,
-                    'signal': signal
-                })
-
-    def start_bot(self):
-        """Inicia a conexão com o WebSocket da Binance."""
-        if self.running:
-            return
-
-        print(f"Iniciando bot de trading para {self.symbol}...")
-        
-        self.twm.start_kline_socket(
-            callback=self._handle_socket_message,
-            symbol=self.symbol,
-            interval=self.timeframe
-        )
-        self.running = True
-
-    def stop_bot(self):
-        """Para o bot e o WebSocket."""
-        if not self.running:
-            return
-        
-        self.twm.stop()
-        self.twm.join()
-        print("Bot encerrado.")
-        self.running = False
-
-    def get_data(self):
-        """Retorna os dados da fila de forma segura."""
-        if not self.data_queue.empty():
-            return self.data_queue.get_nowait()
-        return None
-
-    def get_historical_data(self):
-        """Busca dados históricos da Binance para preencher o gráfico inicial."""
-        if self.historical_data_loaded:
-            return self.rsi_strategy.dataframe
-
-        client = self.twm.get_client()
-        klines = client.get_historical_klines(self.symbol, self.timeframe, "1 day ago UTC")
-        
-        self.rsi_strategy.dataframe = pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        
-        for kline in klines:
-            new_row = {
-                'timestamp': kline,
-                'open': float(kline[1]),
-                'high': float(kline[2]),
-                'low': float(kline[3]),
-                'close': float(kline[4]),
-                'volume': float(kline[5])
-            }
-            new_df = pd.DataFrame([new_row])
-            self.rsi_strategy.dataframe = pd.concat([self.rsi_strategy.dataframe, new_df], ignore_index=True)
-
-        if len(self.rsi_strategy.dataframe) > self.rsi_period:
-            self.rsi_strategy.dataframe = self.rsi_strategy.dataframe.astype({'close': 'float64'})
-            rsi_indicator = ta.momentum.RSIIndicator(self.rsi_strategy.dataframe['close'], window=self.rsi_period)
-            self.rsi_strategy.dataframe['rsi'] = rsi_indicator.rsi()
-            
-        self.historical_data_loaded = True
-        return self.rsi_strategy.dataframe
+    # Pequena pausa para evitar sobrecarga de CPU e controlar a frequência de atualização
+    time.sleep(1)
