@@ -49,6 +49,8 @@ dataframe_placeholder = st.empty()
 # Dicionário para armazenar o histórico de dados para o gráfico
 if 'data_history' not in st.session_state:
     st.session_state.data_history = st.session_state.bot.get_historical_data()
+    st.session_state.data_history['timestamp'] = pd.to_datetime(st.session_state.data_history['timestamp'], unit='ms')
+
 
 # Loop para atualização contínua do dashboard
 while True:
