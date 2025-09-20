@@ -5,4 +5,4 @@ ta-lib
 streamlit
 plotly
 requests
-coinbase-wallet-sdk
+coinbase-advanced-py
