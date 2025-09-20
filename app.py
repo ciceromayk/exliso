@@ -8,16 +8,16 @@ COINMARKETCAP_API_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/lis
 API_REFRESH_INTERVAL = 60  # Segundos
 
 st.set_page_config(
-    page_title="Meme Coin Radar",
-    layout="centered",
+    page_title="Coin Ranking",
+    layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 # --- FUNÇÕES DE LÓGICA E DADOS ---
 @st.cache_data(ttl=API_REFRESH_INTERVAL)
-def fetch_coin_data(api_key, retries=3):
+def fetch_coin_data(api_key, sort_by, limit=10, retries=3):
     """
-    Busca as 20 principais moedas por volume da CoinMarketCap.
+    Busca dados de moedas da CoinMarketCap com base em um critério de ordenação.
     """
     headers = {
         'Accepts': 'application/json',
@@ -25,11 +25,13 @@ def fetch_coin_data(api_key, retries=3):
     }
     params = {
         'start': '1',
-        'limit': '20',
-        'sort': 'volume_24h',
-        'sort_dir': 'desc',
+        'limit': str(limit),
+        'sort': sort_by,
         'convert': 'BRL'
     }
+
+    if sort_by == 'percent_change_24h':
+        params['sort_dir'] = 'desc'
 
     for attempt in range(retries):
         try:
@@ -51,9 +53,34 @@ def fetch_coin_data(api_key, retries=3):
                 return []
     return []
 
+def render_table_card(title, data, sort_by_desc=True):
+    """
+    Renderiza um painel com uma tabela de dados.
+    """
+    st.subheader(title)
+    df_data = []
+    if data:
+        for coin in data:
+            price = coin['quote']['BRL']['price']
+            volume = coin['quote']['BRL']['volume_24h']
+            change = coin['quote']['BRL']['percent_change_24h']
+            
+            df_data.append({
+                "Nome": f"{coin['name']} ({coin['symbol']})",
+                "Preço (R$)": f"R$ {price:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                "Volume 24h (R$)": f"R$ {volume / 1e9:.2f}B".replace(",", "X").replace(".", ",").replace("X", ".") if volume > 1e9 else f"R$ {volume / 1e6:.2f}M".replace(",", "X").replace(".", ",").replace("X", "."),
+                "Variação 24h": f"{change:,.2f}%".replace(",", "X").replace(".", ",").replace("X", "."),
+            })
+
+    if df_data:
+        df = pd.DataFrame(df_data)
+        st.dataframe(df, hide_index=True, use_container_width=True)
+    else:
+        st.info("Dados não disponíveis.")
+
 # --- RENDERIZAÇÃO DA PÁGINA ---
-st.title("Top 20 Moedas por Volume 🚀")
-st.write("Listagem das 20 moedas com maior volume de negociação nas últimas 24 horas.")
+st.title("Coin Ranking 🚀")
+st.write("Visão geral do mercado de criptomoedas: Top Ganhadores, Top Perdedores e Maior Volume.")
 
 if "api_key" not in st.session_state:
     with st.form(key='api_key_form'):
@@ -66,21 +93,26 @@ if "api_key" not in st.session_state:
             st.rerun()
 else:
     with st.spinner("Carregando dados..."):
-        coin_data = fetch_coin_data(st.session_state.api_key)
+        # Dados de Top Ganhadores e Perdedores (ordenados por percent_change_24h)
+        top_gainers_data = fetch_coin_data(st.session_state.api_key, sort_by='percent_change_24h', limit=10)
         
-    if coin_data:
-        # Extrair e formatar os dados para um DataFrame do Pandas
-        df_data = []
-        for coin in coin_data:
-            df_data.append({
-                "Nome": f"{coin['name']} ({coin['symbol']})",
-                "Preço (R$)": f"R$ {coin['quote']['BRL']['price']:.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-                "Volume 24h (R$)": f"R$ {coin['quote']['BRL']['volume_24h'] / 1e9:.2f}B".replace(",", "X").replace(".", ",").replace("X", "."),
-                "Variação 24h": f"{coin['quote']['BRL']['percent_change_24h']:.2f}%",
-                "Capitalização de Mercado (R$)": f"R$ {coin['quote']['BRL']['market_cap'] / 1e9:.2f}B".replace(",", "X").replace(".", ",").replace("X", ".")
-            })
+        # Invertemos a lista para obter os perdedores
+        top_losers_data = top_gainers_data[::-1] if top_gainers_data else []
+
+        # Dados de Maior Volume (ordenados por volume_24h)
+        top_volume_data = fetch_coin_data(st.session_state.api_key, sort_by='volume_24h', limit=10)
         
-        df = pd.DataFrame(df_data)
-        st.dataframe(df, hide_index=True, use_container_width=True)
-    else:
-        st.warning("Não foi possível carregar os dados das moedas. Por favor, verifique sua chave da API ou tente novamente mais tarde.")
+    st.write("---")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        render_table_card("Top Ganhadores", top_gainers_data)
+        
+    with col2:
+        render_table_card("Top Perdedores", top_losers_data)
+        
+    with col3:
+        render_table_card("Maior Volume", top_volume_data)
+
+    st.write("---")
