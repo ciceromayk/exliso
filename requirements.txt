@@ -1,8 +1,2 @@
-python-binance
-python-dotenv
-pandas
-ta-lib
 streamlit
-plotly
 requests
-coinbase-advanced-py
