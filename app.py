@@ -5,7 +5,7 @@ import time
 
 # --- CONFIGURAÇÃO ---
 COINMARKETCAP_API_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-API_REFRESH_INTERVAL = 5  # Segundos
+API_REFRESH_INTERVAL = 60  # Segundos
 
 st.set_page_config(
     page_title="Meme Coin Radar",
@@ -15,17 +15,17 @@ st.set_page_config(
 
 # --- MAPA DAS MOEDAS ---
 coin_map = {
-    'dogwifhat': 'sol',
-    'pepe': 'eth',
-    'book-of-meme': 'sol',
-    'brett': 'base',
-    'bonk': 'sol',
-    'mog-coin': 'eth',
-    'toshi': 'base',
-    'floki': 'eth',
-    'silly-goose': 'sol',
-    'shiba-inu': 'eth',
-    'baby-doge-coin': 'eth'
+    'dogwifhat': {'id': 24708, 'chain': 'sol', 'slug': 'dogwifhat'},
+    'pepe': {'id': 24478, 'chain': 'eth', 'slug': 'pepe'},
+    'book-of-meme': {'id': 28266, 'chain': 'sol', 'slug': 'book-of-meme'},
+    'brett': {'id': 29631, 'chain': 'base', 'slug': 'brett'},
+    'bonk': {'id': 23095, 'chain': 'sol', 'slug': 'bonk'},
+    'mog-coin': {'id': 26909, 'chain': 'eth', 'slug': 'mog-coin'},
+    'toshi': {'id': 26732, 'chain': 'base', 'slug': 'toshi'},
+    'floki': {'id': 24479, 'chain': 'eth', 'slug': 'floki'},
+    'silly-goose': {'id': 27889, 'chain': 'sol', 'slug': 'silly-goose'},
+    'shiba-inu': {'id': 5994, 'chain': 'eth', 'slug': 'shiba-inu'},
+    'baby-doge-coin': {'id': 10925, 'chain': 'eth', 'slug': 'baby-doge-coin'}
 }
 
 # --- FUNÇÕES DE LÓGICA E DADOS ---
@@ -34,13 +34,13 @@ def fetch_coin_data(api_key, retries=3):
     """
     Busca dados de moedas da CoinMarketCap com tentativas de re-conexão.
     """
-    coin_symbols = ",".join([c.upper() for c in coin_map.keys()])
+    coin_symbols = ",".join([coin['id'] for coin in coin_map.values()])
     headers = {
         'Accepts': 'application/json',
         'X-CMC_PRO_API_KEY': api_key,
     }
     params = {
-        'symbol': coin_symbols,
+        'id': coin_symbols,
         'convert': 'BRL'
     }
 
@@ -52,11 +52,12 @@ def fetch_coin_data(api_key, retries=3):
             
             if data['status']['error_code'] == 0:
                 processed_data = {}
-                for symbol, coin_info in data['data'].items():
+                for id, coin_info in data['data'].items():
                     processed_data[coin_info['slug']] = {
-                        'id': coin_info['slug'],
+                        'id': coin_info['id'],
                         'name': coin_info['name'],
                         'symbol': coin_info['symbol'],
+                        'slug': coin_info['slug'],
                         'current_price': coin_info['quote']['BRL']['price'],
                         'total_volume': coin_info['quote']['BRL']['volume_24h'],
                         'market_cap': coin_info['quote']['BRL']['market_cap'],
@@ -177,7 +178,7 @@ else:
     col_count = st.columns(3)
     idx = 0
     for id, coin in coin_data.items():
-        if st.session_state.get('active_filter', 'all') == 'all' or coin_map.get(id) == st.session_state.active_filter:
+        if st.session_state.get('active_filter', 'all') == 'all' or coin_map.get(id, {}).get('chain') == st.session_state.active_filter:
             with col_count[idx % 3]:
                 render_coin_card(coin, st.session_state.alerts.get(id, []))
             idx += 1
