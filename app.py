@@ -4,13 +4,8 @@ import json
 import time
 
 # --- CONFIGURAÇÃO ---
-# Obtenha sua chave gratuita em https://pro.coinmarketcap.com/
-# Cole sua chave da API do CoinMarketCap aqui.
-# Nunca compartilhe esta chave em público!
-COINMARKETCAP_API_KEY = "SUA_CHAVE_AQUI"
-
 COINMARKETCAP_API_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-API_REFRESH_INTERVAL = 60  # Segundos
+API_REFRESH_INTERVAL = 5  # Segundos
 
 st.set_page_config(
     page_title="Meme Coin Radar",
@@ -35,14 +30,14 @@ coin_map = {
 
 # --- FUNÇÕES DE LÓGICA E DADOS ---
 @st.cache_data(ttl=API_REFRESH_INTERVAL)
-def fetch_coin_data(retries=3):
+def fetch_coin_data(api_key, retries=3):
     """
     Busca dados de moedas da CoinMarketCap com tentativas de re-conexão.
     """
     coin_symbols = ",".join([c.upper() for c in coin_map.keys()])
     headers = {
         'Accepts': 'application/json',
-        'X-CMC_PRO_API_KEY': COINMARKETCAP_API_KEY,
+        'X-CMC_PRO_API_KEY': api_key,
     }
     params = {
         'symbol': coin_symbols,
@@ -151,28 +146,38 @@ def render_coin_card(coin, alerts):
 st.title("Meme Coin Radar 🚀")
 st.write("Monitorando movimentos suspeitos no mercado de meme coins em tempo real.")
 
-# Botões de filtro
-st.write("---")
-filter_container = st.container()
-with filter_container:
-    cols = st.columns(4)
-    filters = {'all': 'Todos', 'eth': 'Ethereum', 'sol': 'Solana', 'base': 'Base'}
-    for i, (key, label) in enumerate(filters.items()):
-        with cols[i]:
-            if st.button(label, type="primary" if st.session_state.get('active_filter', 'all') == key else "secondary"):
-                st.session_state.active_filter = key
-                st.rerun()
+if "api_key" not in st.session_state:
+    with st.form(key='api_key_form'):
+        st.header("Insira a sua chave da API")
+        st.write("Por favor, insira a sua chave da API do CoinMarketCap para carregar os dados. Você pode obtê-la gratuitamente em [https://pro.coinmarketcap.com/signup/](https://pro.coinmarketcap.com/signup/).")
+        api_key_input = st.text_input("Chave da API", type="password")
+        submit_button = st.form_submit_button(label='Acessar')
+        if submit_button and api_key_input:
+            st.session_state.api_key = api_key_input
+            st.rerun()
+else:
+    # Botões de filtro
+    st.write("---")
+    filter_container = st.container()
+    with filter_container:
+        cols = st.columns(4)
+        filters = {'all': 'Todos', 'eth': 'Ethereum', 'sol': 'Solana', 'base': 'Base'}
+        for i, (key, label) in enumerate(filters.items()):
+            with cols[i]:
+                if st.button(label, type="primary" if st.session_state.get('active_filter', 'all') == key else "secondary"):
+                    st.session_state.active_filter = key
+                    st.rerun()
 
-# Lógica para carregar os dados
-with st.spinner("Carregando dados..."):
-    coin_data = fetch_coin_data()
-    st.session_state.alerts = check_for_alerts(coin_data)
-    
-# Exibição do Painel principal
-col_count = st.columns(3)
-idx = 0
-for id, coin in coin_data.items():
-    if st.session_state.get('active_filter', 'all') == 'all' or coin_map.get(id) == st.session_state.active_filter:
-        with col_count[idx % 3]:
-            render_coin_card(coin, st.session_state.alerts.get(id, []))
-        idx += 1
+    # Lógica para carregar os dados
+    with st.spinner("Carregando dados..."):
+        coin_data = fetch_coin_data(st.session_state.api_key)
+        st.session_state.alerts = check_for_alerts(coin_data)
+        
+    # Exibição do Painel principal
+    col_count = st.columns(3)
+    idx = 0
+    for id, coin in coin_data.items():
+        if st.session_state.get('active_filter', 'all') == 'all' or coin_map.get(id) == st.session_state.active_filter:
+            with col_count[idx % 3]:
+                render_coin_card(coin, st.session_state.alerts.get(id, []))
+            idx += 1
