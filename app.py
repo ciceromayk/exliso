@@ -11,7 +11,7 @@ st.set_page_config(
 )
 
 # --- Constantes e Variáveis de Estado ---
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"] if "GEMINI_API_KEY" in st.secrets else ""
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 COINGECKO_API_URL = "https://api.coingecko.com/api/v3/coins/markets"
 API_REFRESH_INTERVAL = 30  # Segundos
 
@@ -37,18 +37,21 @@ if 'alerts' not in st.session_state:
     st.session_state.alerts = {}
 if 'coin_data' not in st.session_state:
     st.session_state.coin_data = {}
+if 'gemini_api_url' not in st.session_state:
+    st.session_state.gemini_api_url = st.secrets.get("GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent")
+
 
 # --- Funções de Formatação ---
 def format_currency(value):
     if value is None:
-        return "N/A"
+        return "Dados não disponíveis"
     if value < 0.01:
         return f"R$ {value:,.8f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def format_large_number(value):
     if value is None:
-        return "N/A"
+        return "Dados não disponíveis"
     if value >= 1e9:
         return f"R$ {value/1e9:.2f}B"
     if value >= 1e6:
@@ -81,6 +84,9 @@ def fetch_coin_data():
         return {}
 
 def generate_gemini_analysis(coin_data):
+    if not GEMINI_API_KEY:
+        return "Chave da API do Gemini não configurada. Por favor, adicione a chave nos segredos da aplicação."
+
     user_prompt = f"""
     Atue como um analista de mercado de criptomoedas profissional. Com base nos seguintes dados para a meme coin {coin_data['name']} ({coin_data['symbol'].upper()}), forneça uma análise muito breve, concisa e acionável. Foque nos alertas de atividade suspeita e nas principais métricas como preço, volume e capitalização de mercado. A resposta deve ser em português.
 
@@ -100,7 +106,7 @@ def generate_gemini_analysis(coin_data):
 
     try:
         response = requests.post(
-            f"{st.secrets['GEMINI_API_URL']}?key={GEMINI_API_KEY}",
+            f"{st.session_state.gemini_api_url}?key={GEMINI_API_KEY}",
             headers={'Content-Type': 'application/json'},
             data=json.dumps(payload),
             timeout=30
@@ -209,12 +215,12 @@ if st.session_state.selected_coin:
         
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Preço Atual", format_currency(selected_coin_data['current_price']))
+            st.metric("Preço Atual", format_currency(selected_coin_data.get('current_price')))
         with col2:
-            st.metric("Mudança 24h", f"{selected_coin_data['price_change_percentage_24h']:.1f}%")
+            st.metric("Mudança 24h", f"{selected_coin_data.get('price_change_percentage_24h', 0):.1f}%")
         
-        st.metric("Volume 24h", format_large_number(selected_coin_data['total_volume']))
-        st.metric("Capitalização de Mercado", format_large_number(selected_coin_data['market_cap']))
+        st.metric("Volume 24h", format_large_number(selected_coin_data.get('total_volume')))
+        st.metric("Capitalização de Mercado", format_large_number(selected_coin_data.get('market_cap')))
         
         st.markdown("---")
         
