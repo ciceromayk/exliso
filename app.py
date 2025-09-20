@@ -4,8 +4,13 @@ import json
 import time
 
 # --- CONFIGURAÇÃO ---
-COINGECKO_API_URL = "https://api.coingecko.com/api/v3/coins/markets"
-API_REFRESH_INTERVAL = 30  # Segundos
+# Obtenha sua chave gratuita em https://pro.coinmarketcap.com/
+# Cole sua chave da API do CoinMarketCap aqui.
+# Nunca compartilhe esta chave em público!
+COINMARKETCAP_API_KEY = "SUA_CHAVE_AQUI"
+
+COINMARKETCAP_API_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+API_REFRESH_INTERVAL = 60  # Segundos
 
 st.set_page_config(
     page_title="Meme Coin Radar",
@@ -32,24 +37,48 @@ coin_map = {
 @st.cache_data(ttl=API_REFRESH_INTERVAL)
 def fetch_coin_data(retries=3):
     """
-    Busca dados de moedas da CoinGecko com tentativas de re-conexão.
-    Retries: número de tentativas antes de falhar.
+    Busca dados de moedas da CoinMarketCap com tentativas de re-conexão.
     """
-    coin_ids = ",".join(coin_map.keys())
-    url = f"{COINGECKO_API_URL}?vs_currency=brl&ids={coin_ids}&price_change_percentage=1h,24h"
-    
+    coin_symbols = ",".join([c.upper() for c in coin_map.keys()])
+    headers = {
+        'Accepts': 'application/json',
+        'X-CMC_PRO_API_KEY': COINMARKETCAP_API_KEY,
+    }
+    params = {
+        'symbol': coin_symbols,
+        'convert': 'BRL'
+    }
+
     for attempt in range(retries):
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(COINMARKETCAP_API_URL, headers=headers, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
-            return {coin['id']: coin for coin in data}
+            
+            if data['status']['error_code'] == 0:
+                processed_data = {}
+                for symbol, coin_info in data['data'].items():
+                    processed_data[coin_info['slug']] = {
+                        'id': coin_info['slug'],
+                        'name': coin_info['name'],
+                        'symbol': coin_info['symbol'],
+                        'current_price': coin_info['quote']['BRL']['price'],
+                        'total_volume': coin_info['quote']['BRL']['volume_24h'],
+                        'market_cap': coin_info['quote']['BRL']['market_cap'],
+                        'price_change_percentage_1h_in_currency': coin_info['quote']['BRL']['percent_change_1h'],
+                        'price_change_percentage_24h': coin_info['quote']['BRL']['percent_change_24h'],
+                    }
+                return processed_data
+            else:
+                st.error(f"Erro na API do CoinMarketCap: {data['status']['error_message']}")
+                return {}
+
         except requests.exceptions.RequestException as e:
             if attempt < retries - 1:
                 st.warning(f"Tentativa {attempt + 1}/{retries} falhou. Tentando novamente em 5 segundos...")
                 time.sleep(5)
             else:
-                st.error(f"Erro ao carregar dados do CoinGecko após {retries} tentativas: {e}")
+                st.error(f"Erro ao carregar dados do CoinMarketCap após {retries} tentativas: {e}")
                 return {}
     return {}
 
@@ -64,7 +93,6 @@ def check_for_alerts(current_data):
             alert_type = 'Aumento' if price_change_1h > 0 else 'Queda'
             alerts[id].append(f"{alert_type} de preço de {abs(price_change_1h):.1f}% na última hora")
         
-        # Lógica simplificada de pico de volume para demonstração
         if coin.get('total_volume') is not None and coin['total_volume'] > 100000000:
             alerts[id].append(f"Alto volume: {format_large_number(coin['total_volume'])}")
     return alerts
