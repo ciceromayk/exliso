@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import json
+import time
 
 # --- CONFIGURAÇÃO ---
 COINGECKO_API_URL = "https://api.coingecko.com/api/v3/coins/markets"
@@ -29,18 +30,28 @@ coin_map = {
 
 # --- FUNÇÕES DE LÓGICA E DADOS ---
 @st.cache_data(ttl=API_REFRESH_INTERVAL)
-def fetch_coin_data():
-    """Busca dados de moedas da CoinGecko."""
+def fetch_coin_data(retries=3):
+    """
+    Busca dados de moedas da CoinGecko com tentativas de re-conexão.
+    Retries: número de tentativas antes de falhar.
+    """
     coin_ids = ",".join(coin_map.keys())
     url = f"{COINGECKO_API_URL}?vs_currency=brl&ids={coin_ids}&price_change_percentage=1h,24h"
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        return {coin['id']: coin for coin in data}
-    except requests.exceptions.RequestException as e:
-        st.error(f"Erro ao carregar dados do CoinGecko: {e}")
-        return {}
+    
+    for attempt in range(retries):
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            return {coin['id']: coin for coin in data}
+        except requests.exceptions.RequestException as e:
+            if attempt < retries - 1:
+                st.warning(f"Tentativa {attempt + 1}/{retries} falhou. Tentando novamente em 5 segundos...")
+                time.sleep(5)
+            else:
+                st.error(f"Erro ao carregar dados do CoinGecko após {retries} tentativas: {e}")
+                return {}
+    return {}
 
 def check_for_alerts(current_data):
     """Detecta alertas de preço e volume."""
