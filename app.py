@@ -34,6 +34,8 @@ if 'active_filter' not in st.session_state:
     st.session_state.active_filter = 'all'
 if 'selected_coin' not in st.session_state:
     st.session_state.selected_coin = None
+if 'alerts' not in st.session_state:
+    st.session_state.alerts = {}
 
 # --- Funções de Formatação ---
 def format_currency(value):
@@ -107,28 +109,28 @@ def generate_gemini_analysis(coin_data):
 
 # --- Funções Auxiliares para Análise ---
 def check_for_alerts(current_data, previous_data):
-    alerts = {}
     for id, coin in current_data.items():
-        alerts[id] = st.session_state.alerts.get(id, []) if 'alerts' in st.session_state else []
+        if id not in st.session_state.alerts:
+            st.session_state.alerts[id] = []
         
         previous_coin = previous_data.get(id)
         if not previous_coin:
             continue
 
-        price_change_1h = coin.get('price_change_percentage_1h_in_currency', 0)
-        volume_change = (coin.get('total_volume', 0) - previous_coin.get('total_volume', 0)) / (previous_coin.get('total_volume', 0) or 1)
-
-        if abs(price_change_1h) > 5:
+        price_change_1h = coin.get('price_change_percentage_1h_in_currency')
+        if price_change_1h is not None and abs(price_change_1h) > 5:
             alert_type = 'Aumento' if price_change_1h > 0 else 'Queda'
-            alerts[id].append(f"{alert_type} de preço de {abs(price_change_1h):.1f}% na última hora")
+            st.session_state.alerts[id].append(f"{alert_type} de preço de {abs(price_change_1h):.1f}% na última hora")
         
-        if volume_change > 0.5:
-            alerts[id].append(f"Pico de volume de {volume_change * 100:.0f}%")
+        current_volume = coin.get('total_volume', 0)
+        previous_volume = previous_coin.get('total_volume', 0)
+        if previous_volume > 0:
+            volume_change = (current_volume - previous_volume) / previous_volume
+            if volume_change > 0.5:
+                st.session_state.alerts[id].append(f"Pico de volume de {volume_change * 100:.0f}%")
         
-        if len(alerts[id]) > 5:
-            alerts[id] = alerts[id][-5:]
-    
-    st.session_state.alerts = alerts
+        if len(st.session_state.alerts[id]) > 5:
+            st.session_state.alerts[id] = st.session_state.alerts[id][-5:]
     
 # --- Funções de Renderização da UI ---
 def render_coin_card(coin, chain_info, alerts):
