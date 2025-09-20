@@ -2,7 +2,8 @@ import streamlit as st
 import requests
 import json
 import time
-from binance.client import Client
+from coinbase.wallet.client import Client as CoinbaseClient
+from requests.exceptions import HTTPError
 
 # --- Configuração da Página ---
 st.set_page_config(
@@ -15,7 +16,7 @@ st.set_page_config(
 GEMINI_API_KEY = ""
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
 COINGECKO_API_URL = "https://api.coingecko.com/api/v3/coins/markets"
-API_REFRESH_INTERVAL = 30 # Segundos
+API_REFRESH_INTERVAL = 30  # Segundos
 
 coin_map = {
     'dogwifhat': 'sol',
@@ -37,8 +38,8 @@ if 'selected_coin' not in st.session_state:
     st.session_state.selected_coin = None
 if 'alerts' not in st.session_state:
     st.session_state.alerts = {}
-if 'binance_client' not in st.session_state:
-    st.session_state.binance_client = None
+if 'coinbase_client' not in st.session_state:
+    st.session_state.coinbase_client = None
 if 'wallet_data' not in st.session_state:
     st.session_state.wallet_data = {}
 
@@ -141,43 +142,36 @@ def check_for_alerts(current_data, previous_data):
         if len(st.session_state.alerts[id]) > 5:
             st.session_state.alerts[id] = st.session_state.alerts[id][-5:]
 
-# --- Funções de API da Binance ---
-def get_binance_balance(api_key, api_secret):
+# --- Funções de API da Coinbase ---
+def get_coinbase_balance(api_key, api_secret):
     try:
-        client = Client(api_key, api_secret)
-        info = client.get_account()
-        balances = info['balances']
+        client = CoinbaseClient(api_key, api_secret)
+        accounts = client.get_accounts().data
         total_value_brl = 0
         holdings = []
         
-        for balance in balances:
-            asset = balance['asset'].lower()
-            free = float(balance['free'])
-            locked = float(balance['locked'])
+        for account in accounts:
+            balance_brl = float(account['native_balance']['amount']) if account['native_balance']['currency'] == 'BRL' else 0
+            total_value_brl += balance_brl
             
-            if free > 0.000001 or locked > 0.000001:
-                try:
-                    price_info = client.get_avg_price(symbol=f'{balance["asset"]}BRL')
-                    price_brl = float(price_info['price'])
-                    total_asset_value = (free + locked) * price_brl
-                    total_value_brl += total_asset_value
-                    
-                    holdings.append({
-                        'asset': balance['asset'],
-                        'amount': free + locked,
-                        'value_brl': total_asset_value,
-                        'price_brl': price_brl
-                    })
-                except Exception:
-                    pass
+            if float(account['balance']['amount']) > 0:
+                holdings.append({
+                    'asset': account['currency']['code'],
+                    'amount': float(account['balance']['amount']),
+                    'value_brl': balance_brl,
+                    'price_brl': float(account['native_balance']['amount']) / float(account['balance']['amount']) if float(account['balance']['amount']) > 0 else 0
+                })
         
         st.session_state.wallet_data = {
             'total_value': total_value_brl,
             'holdings': sorted(holdings, key=lambda x: x['value_brl'], reverse=True)
         }
         return True
+    except HTTPError as e:
+        st.error(f"Erro de HTTP ao conectar com a Coinbase: {e.response.text}")
+        return False
     except Exception as e:
-        st.error(f"Erro ao conectar com a API da Binance: {e}")
+        st.error(f"Erro ao conectar com a API da Coinbase: {e}")
         return False
 
 # --- Funções de Renderização da UI ---
@@ -220,26 +214,26 @@ def render_coin_card(coin, chain_info, alerts):
             st.rerun()
 
 # --- Barra Lateral (Configuração da Carteira) ---
-st.sidebar.header("Conectar Carteira da Binance")
+st.sidebar.header("Conectar Carteira da Coinbase")
 api_key = st.sidebar.text_input("Chave da API", type="password")
 api_secret = st.sidebar.text_input("Chave Secreta", type="password")
 
 if st.sidebar.button("Conectar"):
     if api_key and api_secret:
-        if get_binance_balance(api_key, api_secret):
+        if get_coinbase_balance(api_key, api_secret):
             st.sidebar.success("Conexão bem-sucedida!")
-            st.session_state.binance_client = Client(api_key, api_secret)
+            st.session_state.coinbase_client = CoinbaseClient(api_key, api_secret)
     else:
         st.sidebar.error("Por favor, insira ambas as chaves.")
 
-if st.session_state.binance_client and 'wallet_data' in st.session_state:
+if st.session_state.coinbase_client and 'wallet_data' in st.session_state:
     st.sidebar.markdown("---")
     st.sidebar.subheader("Sua Carteira")
     st.sidebar.metric("Saldo Total", format_currency(st.session_state.wallet_data['total_value']))
     
     st.sidebar.write("### Posições")
     for holding in st.session_state.wallet_data['holdings']:
-        st.sidebar.markdown(f"**{holding['asset'].upper()}:** {holding['amount']:.4f} ({format_currency(holding['value_brl'])})")
+        st.sidebar.markdown(f"**{holding['asset']}:** {holding['amount']:.4f} ({format_currency(holding['value_brl'])})")
 
 
 # --- Renderização Principal do Aplicativo ---
