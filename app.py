@@ -2,9 +2,6 @@ import streamlit as st
 import requests
 import json
 import time
-from coinbase.wallet.client import Client as CoinbaseClient
-from coinbase.wallet.error import APIError
-from requests.exceptions import HTTPError
 
 # --- Configuração da Página ---
 st.set_page_config(
@@ -38,10 +35,8 @@ if 'selected_coin' not in st.session_state:
     st.session_state.selected_coin = None
 if 'alerts' not in st.session_state:
     st.session_state.alerts = {}
-if 'coinbase_client' not in st.session_state:
-    st.session_state.coinbase_client = None
-if 'wallet_data' not in st.session_state:
-    st.session_state.wallet_data = {}
+if 'coin_data' not in st.session_state:
+    st.session_state.coin_data = {}
 
 # --- Funções de Formatação ---
 def format_currency(value):
@@ -105,7 +100,7 @@ def generate_gemini_analysis(coin_data):
 
     try:
         response = requests.post(
-            f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
+            f"{st.secrets['GEMINI_API_URL']}?key={GEMINI_API_KEY}",
             headers={'Content-Type': 'application/json'},
             data=json.dumps(payload),
             timeout=30
@@ -142,63 +137,32 @@ def check_for_alerts(current_data, previous_data):
         if len(st.session_state.alerts[id]) > 5:
             st.session_state.alerts[id] = st.session_state.alerts[id][-5:]
 
-# --- Funções de API da Coinbase ---
-def get_coinbase_balance(api_key, api_secret):
-    try:
-        client = CoinbaseClient(api_key, api_secret)
-        accounts = client.get_accounts().data
-        total_value_brl = 0
-        holdings = []
+def render_coin_card(coin, chain_info, alerts):
+    with st.container(border=True):
+        st.subheader(f"{coin['name']} ({coin['symbol'].upper()})")
         
-        for account in accounts:
-            balance_brl = float(account['native_balance']['amount']) if account['native_balance']['currency'] == 'BRL' else 0
-            total_value_brl += balance_brl
-            
-            if float(account['balance']['amount']) > 0:
-                holdings.append({
-                    'asset': account['currency']['code'],
-                    'amount': float(account['balance']['amount']),
-                    'value_brl': balance_brl,
-                    'price_brl': float(account['native_balance']['amount']) / float(account['balance']['amount']) if float(account['balance']['amount']) > 0 else 0
-                })
+        chain_name, color = chain_info
+        st.markdown(f"<span style='background-color:{color}; padding: 4px 8px; border-radius: 5px; color: white; font-size: 12px;'>{chain_name}</span>", unsafe_allow_html=True)
         
-        st.session_state.wallet_data = {
-            'total_value': total_value_brl,
-            'holdings': sorted(holdings, key=lambda x: x['value_brl'], reverse=True)
-        }
-        return True
-    except HTTPError as e:
-        st.error(f"Erro de HTTP ao conectar com a Coinbase: {e.response.text}")
-        return False
-    except APIError as e:
-        st.error(f"Erro de API ao conectar com a Coinbase: {e}")
-        return False
-    except Exception as e:
-        st.error(f"Erro inesperado ao conectar com a API da Coinbase: {e}")
-        return False
-
-# --- Barra Lateral (Configuração da Carteira) ---
-st.sidebar.header("Conectar Carteira da Coinbase")
-api_key = st.sidebar.text_input("Chave da API", type="password")
-api_secret = st.sidebar.text_input("Chave Secreta", type="password")
-
-if st.sidebar.button("Conectar"):
-    if api_key and api_secret:
-        if get_coinbase_balance(api_key, api_secret):
-            st.sidebar.success("Conexão bem-sucedida!")
-            st.session_state.coinbase_client = CoinbaseClient(api_key, api_secret)
-    else:
-        st.sidebar.error("Por favor, insira ambas as chaves.")
-
-if st.session_state.coinbase_client and 'wallet_data' in st.session_state:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("Sua Carteira")
-    st.sidebar.metric("Saldo Total", format_currency(st.session_state.wallet_data['total_value']))
-    
-    st.sidebar.write("### Posições")
-    for holding in st.session_state.wallet_data['holdings']:
-        st.sidebar.markdown(f"**{holding['asset']}:** {holding['amount']:.4f} ({format_currency(holding['value_brl'])})")
-
+        st.write("---")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Preço", format_currency(coin['current_price']))
+        with col2:
+            st.metric("Volume 24h", format_large_number(coin['total_volume']))
+        
+        if alerts:
+            st.markdown(f"**Alertas Recentes:**")
+            for alert in alerts:
+                st.info(alert)
+        else:
+            st.markdown("*Nenhum alerta suspeito recente.*")
+        
+        st.write("---")
+        if st.button("Analisar", key=f"btn_{coin['id']}"):
+            st.session_state.selected_coin = coin['id']
+            st.rerun()
 
 # --- Renderização Principal do Aplicativo ---
 st.title("Meme Coin Radar 🚀")
