@@ -3,6 +3,7 @@ import requests
 import json
 import time
 from coinbase.wallet.client import Client as CoinbaseClient
+from coinbase.wallet.error import APIError
 from requests.exceptions import HTTPError
 
 # --- Configuração da Página ---
@@ -13,8 +14,7 @@ st.set_page_config(
 )
 
 # --- Constantes e Variáveis de Estado ---
-GEMINI_API_KEY = ""
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"] if "GEMINI_API_KEY" in st.secrets else ""
 COINGECKO_API_URL = "https://api.coingecko.com/api/v3/coins/markets"
 API_REFRESH_INTERVAL = 30  # Segundos
 
@@ -170,48 +170,12 @@ def get_coinbase_balance(api_key, api_secret):
     except HTTPError as e:
         st.error(f"Erro de HTTP ao conectar com a Coinbase: {e.response.text}")
         return False
-    except Exception as e:
-        st.error(f"Erro ao conectar com a API da Coinbase: {e}")
+    except APIError as e:
+        st.error(f"Erro de API ao conectar com a Coinbase: {e}")
         return False
-
-# --- Funções de Renderização da UI ---
-def render_coin_card(coin, chain_info, alerts):
-    price_change = coin.get('price_change_percentage_24h', 0)
-    change_color = "green" if price_change >= 0 else "red"
-
-    card = st.container(border=True)
-    with card:
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.markdown(f"**<span style='font-size:1.5em;'>{coin['name']}</span>** <span style='color:grey; font-size:1em;'>({coin['symbol'].upper()})</span>", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"<div style='text-align:right; border-radius:10px; padding:0.25em 0.5em; background-color:{chain_info[1]}; color:white; font-size:0.8em;'>{chain_info[0]}</div>", unsafe_allow_html=True)
-
-        st.markdown(f"**<span style='font-size:2em;'>{format_currency(coin['current_price'])}</span>** <span style='color:{change_color}; font-size:1.5em;'>{price_change:.1f}%</span>", unsafe_allow_html=True)
-        
-        st.markdown(f"""
-            <div style='display:flex; justify-content:space-between; font-size:0.9em; margin-top:1em;'>
-                <span style='color:grey;'>Volume (24h):</span>
-                <span>**{format_large_number(coin['total_volume'])}**</span>
-            </div>
-            <div style='display:flex; justify-content:space-between; font-size:0.9em;'>
-                <span style='color:grey;'>Capitalização de Mercado:</span>
-                <span>**{format_large_number(coin['market_cap'])}**</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<hr style='border:1px solid #f0f2f6; margin-top:1em; margin-bottom:1em;'>", unsafe_allow_html=True)
-
-        st.markdown(f"**🚨 Alertas Recentes:**")
-        if alerts:
-            for alert in alerts:
-                st.markdown(f"⚡ {alert}")
-        else:
-            st.markdown("Nenhuma atividade suspeita.")
-        
-        if st.button("Ver Detalhes", key=f"details_btn_{coin['id']}"):
-            st.session_state.selected_coin = coin['id']
-            st.rerun()
+    except Exception as e:
+        st.error(f"Erro inesperado ao conectar com a API da Coinbase: {e}")
+        return False
 
 # --- Barra Lateral (Configuração da Carteira) ---
 st.sidebar.header("Conectar Carteira da Coinbase")
