@@ -3,14 +3,7 @@ import requests
 import json
 
 # --- CONFIGURAÇÃO ---
-# Cole sua chave da API do Gemini aqui.
-# Isso permite que o aplicativo funcione sem o gerenciamento de segredos do Streamlit.
-# Nunca compartilhe esta chave!
-GEMINI_API_KEY = "SUA_CHAVE_GEMINI_AQUI"
-
-# URLs das APIs
 COINGECKO_API_URL = "https://api.coingecko.com/api/v3/coins/markets"
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
 API_REFRESH_INTERVAL = 30  # Segundos
 
 st.set_page_config(
@@ -48,42 +41,6 @@ def fetch_coin_data():
     except requests.exceptions.RequestException as e:
         st.error(f"Erro ao carregar dados do CoinGecko: {e}")
         return {}
-
-def generate_gemini_analysis(coin_data):
-    """Gera uma análise de mercado usando a API Gemini."""
-    if GEMINI_API_KEY == "SUA_CHAVE_GEMINI_AQUI" or not GEMINI_API_KEY:
-        return "Por favor, insira sua chave da API do Gemini no código para usar esta funcionalidade."
-
-    user_prompt = f"""
-    Atue como um analista de mercado de criptomoedas profissional. Com base nos dados para a meme coin {coin_data['name']} ({coin_data['symbol'].upper()}), forneça uma análise muito breve, concisa e acionável. Foque nos alertas de atividade suspeita e nas principais métricas como preço, volume e capitalização de mercado. A resposta deve ser em português.
-
-    Meme Coin: {coin_data['name']} ({coin_data['symbol'].upper()})
-    Preço Atual: {format_currency(coin_data.get('current_price'))}
-    Mudança 24h: {coin_data.get('price_change_percentage_24h', 0):.1f}%
-    Volume 24h: {format_large_number(coin_data.get('total_volume'))}
-    Capitalização de Mercado: {format_large_number(coin_data.get('market_cap'))}
-    
-    Forneça um breve resumo e uma visão acionável para um potencial comprador.
-    """
-    
-    payload = {
-        "contents": [{"parts": [{"text": user_prompt}]}],
-    }
-
-    try:
-        response = requests.post(
-            f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
-            headers={'Content-Type': 'application/json'},
-            data=json.dumps(payload),
-            timeout=30
-        )
-        response.raise_for_status()
-        result = response.json()
-        return result['candidates'][0]['content']['parts'][0]['text']
-    except requests.exceptions.RequestException as e:
-        return f"Erro ao gerar análise: {e}"
-    except (IndexError, KeyError):
-        return "Erro ao processar a resposta da API do Gemini."
 
 def check_for_alerts(current_data):
     """Detecta alertas de preço e volume."""
@@ -151,11 +108,6 @@ def render_coin_card(coin, alerts):
         else:
             st.markdown("*Nenhum alerta suspeito recente.*")
         
-        st.write("---")
-        if st.button("Analisar", key=f"btn_{coin['id']}"):
-            st.session_state.selected_coin = coin['id']
-            st.rerun()
-
 # --- RENDERIZAÇÃO DA PÁGINA ---
 st.title("Meme Coin Radar 🚀")
 st.write("Monitorando movimentos suspeitos no mercado de meme coins em tempo real.")
@@ -170,7 +122,6 @@ with filter_container:
         with cols[i]:
             if st.button(label, type="primary" if st.session_state.get('active_filter', 'all') == key else "secondary"):
                 st.session_state.active_filter = key
-                st.session_state.selected_coin = None
                 st.rerun()
 
 # Lógica para carregar os dados
@@ -178,39 +129,11 @@ with st.spinner("Carregando dados..."):
     coin_data = fetch_coin_data()
     st.session_state.alerts = check_for_alerts(coin_data)
     
-# Exibição do "Modal" de detalhes da moeda
-if st.session_state.get('selected_coin'):
-    selected_coin_data = coin_data.get(st.session_state.selected_coin)
-    if selected_coin_data:
-        st.subheader(f"Detalhes de {selected_coin_data['name']}")
-        
-        st.metric("Preço Atual", format_currency(selected_coin_data.get('current_price')))
-        st.metric("Mudança 24h", f"{selected_coin_data.get('price_change_percentage_24h', 0):.1f}%")
-        st.metric("Volume 24h", format_large_number(selected_coin_data.get('total_volume')))
-        
-        st.markdown("---")
-        
-        if st.button("Gerar Análise com ✨Gemini"):
-            with st.spinner("Gerando análise..."):
-                analysis_text = generate_gemini_analysis(selected_coin_data)
-                st.session_state.gemini_analysis = analysis_text
-        
-        if st.session_state.get('gemini_analysis'):
-            st.subheader("Análise de Mercado com Gemini")
-            st.write(st.session_state.gemini_analysis)
-        
-        st.write("---")
-        if st.button("Voltar para o painel"):
-            st.session_state.selected_coin = None
-            if 'gemini_analysis' in st.session_state:
-                del st.session_state.gemini_analysis
-            st.rerun()
-else:
-    # Exibição do Painel principal
-    col_count = st.columns(3)
-    idx = 0
-    for id, coin in coin_data.items():
-        if st.session_state.get('active_filter', 'all') == 'all' or coin_map.get(id) == st.session_state.active_filter:
-            with col_count[idx % 3]:
-                render_coin_card(coin, st.session_state.alerts.get(id, []))
-            idx += 1
+# Exibição do Painel principal
+col_count = st.columns(3)
+idx = 0
+for id, coin in coin_data.items():
+    if st.session_state.get('active_filter', 'all') == 'all' or coin_map.get(id) == st.session_state.active_filter:
+        with col_count[idx % 3]:
+            render_coin_card(coin, st.session_state.alerts.get(id, []))
+        idx += 1
