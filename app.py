@@ -17,12 +17,12 @@ st.set_page_config(
 @st.cache_data(ttl=API_REFRESH_INTERVAL)
 def fetch_coin_data(retries=3):
     """
-    Busca os dados das 20 principais moedas por volume na CoinGecko.
+    Busca os dados das moedas na CoinGecko.
     """
     params = {
         'vs_currency': 'brl',
         'order': 'market_cap_desc',
-        'per_page': 20,
+        'per_page': 50, # Aumentei o limite para capturar mais moedas com variação
         'page': 1,
         'sparkline': False,
         'price_change_percentage': '24h'
@@ -43,7 +43,7 @@ def fetch_coin_data(retries=3):
                 return []
     return []
 
-def render_table_card(title, data, sort_by_desc=True):
+def render_table_card(title, data):
     """
     Renderiza um painel com uma tabela de dados.
     """
@@ -75,12 +75,21 @@ def render_table_card(title, data, sort_by_desc=True):
 
 # --- RENDERIZAÇÃO DA PÁGINA ---
 st.title("Coin Ranking 🚀")
-st.write("Visão geral do mercado de criptomoedas: as 20 moedas com maior capitalização de mercado.")
+st.write("Visão geral do mercado de criptomoedas: as 50 moedas com maior capitalização de mercado.")
 
 with st.spinner("Carregando dados do CoinGecko..."):
     coin_data = fetch_coin_data()
-    
+
+st.write("---")
+
 if coin_data:
-    render_table_card("20 Moedas Principais por Capitalização", coin_data)
+    # 20 Moedas Principais por Capitalização
+    render_table_card("20 Moedas Principais por Capitalização", coin_data[:20])
+
+    st.write("---")
+
+    # Moedas com Ganhos Anormais (>30%)
+    anomalies_data = [coin for coin in coin_data if coin.get('price_change_percentage_24h_in_currency', 0) > 30]
+    render_table_card("Anormalidades de Preço (>30%)", anomalies_data)
 else:
     st.warning("Não foi possível carregar os dados. Por favor, tente novamente mais tarde.")
