@@ -22,7 +22,7 @@ def fetch_coin_data(retries=3):
     params = {
         'vs_currency': 'brl',
         'order': 'market_cap_desc',
-        'per_page': 50, # Aumentei o limite para capturar mais moedas com variação
+        'per_page': 250, # Aumentei o limite para capturar mais moedas com variação
         'page': 1,
         'sparkline': False,
         'price_change_percentage': '24h'
@@ -75,7 +75,7 @@ def render_table_card(title, data):
 
 # --- RENDERIZAÇÃO DA PÁGINA ---
 st.title("Coin Ranking 🚀")
-st.write("Visão geral do mercado de criptomoedas: as 50 moedas com maior capitalização de mercado.")
+st.write("Visão geral do mercado de criptomoedas: as 250 moedas com maior capitalização de mercado.")
 
 with st.spinner("Carregando dados do CoinGecko..."):
     coin_data = fetch_coin_data()
