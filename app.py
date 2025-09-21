@@ -43,9 +43,9 @@ def fetch_coin_data(retries=3):
                 return []
     return []
 
-def render_table_card(title, data, sort_key=None, sort_reverse=False):
+def render_table_card(title, data):
     """
-    Renderiza um painel com uma tabela de dados, com opção de ordenação.
+    Renderiza um painel com uma tabela de dados.
     """
     st.subheader(title)
     df_data = []
@@ -55,7 +55,6 @@ def render_table_card(title, data, sort_key=None, sort_reverse=False):
             volume = coin.get('total_volume')
             change_percent = coin.get('price_change_percentage_24h_in_currency')
             
-            # Formatação segura para valores que podem ser None
             price_formatted = f"R$ {price:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if price is not None else "N/A"
             volume_formatted = f"R$ {volume / 1e9:.2f}B".replace(",", "X").replace(".", ",").replace("X", ".") if volume is not None and volume > 1e9 else (f"R$ {volume / 1e6:.2f}M".replace(",", "X").replace(".", ",").replace("X", ".") if volume is not None else "N/A")
             change_formatted = f"{change_percent:,.2f}%".replace(",", "X").replace(".", ",").replace("X", ".") if change_percent is not None else "N/A"
@@ -85,12 +84,15 @@ st.write("---")
 if coin_data:
     # Filtra os dados de forma segura
     top_20_coins = coin_data[:20]
-    # Ordena os ganhadores de forma segura, tratando valores nulos
+    
+    # Ordena os ganhadores e perdedores de forma segura, tratando valores nulos
     top_gainers = sorted(coin_data, key=lambda x: x.get('price_change_percentage_24h_in_currency') or -1000, reverse=True)[:10]
+    top_losers = sorted(coin_data, key=lambda x: x.get('price_change_percentage_24h_in_currency') or 1000, reverse=False)[:10]
+    
     anomalies_data = [coin for coin in coin_data if isinstance(coin.get('price_change_percentage_24h_in_currency'), (float, int)) and coin.get('price_change_percentage_24h_in_currency') > 30]
 
     # Renderiza em colunas
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         render_table_card("Moedas Principais (20+)", top_20_coins)
@@ -99,6 +101,9 @@ if coin_data:
         render_table_card("Top Ganhadores", top_gainers)
     
     with col3:
+        render_table_card("Top Perdedores", top_losers)
+
+    with col4:
         if anomalies_data:
             render_table_card("Anomalias de Preço (>30%)", anomalies_data)
         else:
