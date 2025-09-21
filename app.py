@@ -13,6 +13,15 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# Injeta CSS personalizado para reduzir a fonte das tabelas
+st.markdown("""
+    <style>
+        .stDataFrame {
+            font-size: 10px;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
 # --- FUNÇÕES DE LÓGICA E DADOS ---
 @st.cache_data(ttl=API_REFRESH_INTERVAL)
 def fetch_coin_data(retries=3):
