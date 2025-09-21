@@ -22,7 +22,7 @@ def fetch_coin_data(retries=3):
     params = {
         'vs_currency': 'brl',
         'order': 'market_cap_desc',
-        'per_page': 250, # Aumentei o limite para capturar mais moedas com variação
+        'per_page': 250, 
         'page': 1,
         'sparkline': False,
         'price_change_percentage': '24h'
@@ -43,9 +43,9 @@ def fetch_coin_data(retries=3):
                 return []
     return []
 
-def render_table_card(title, data):
+def render_table_card(title, data, sort_key=None, sort_reverse=False):
     """
-    Renderiza um painel com uma tabela de dados.
+    Renderiza um painel com uma tabela de dados, com opção de ordenação.
     """
     st.subheader(title)
     df_data = []
@@ -83,9 +83,10 @@ with st.spinner("Carregando dados do CoinGecko..."):
 st.write("---")
 
 if coin_data:
-    # Filtra os dados
+    # Filtra os dados de forma segura
     top_20_coins = coin_data[:20]
-    top_gainers = sorted(coin_data, key=lambda x: x.get('price_change_percentage_24h_in_currency', -1000), reverse=True)[:10]
+    # Ordena os ganhadores de forma segura, tratando valores nulos
+    top_gainers = sorted(coin_data, key=lambda x: x.get('price_change_percentage_24h_in_currency') or -1000, reverse=True)[:10]
     anomalies_data = [coin for coin in coin_data if isinstance(coin.get('price_change_percentage_24h_in_currency'), (float, int)) and coin.get('price_change_percentage_24h_in_currency') > 30]
 
     # Renderiza em colunas
@@ -98,7 +99,10 @@ if coin_data:
         render_table_card("Top Ganhadores", top_gainers)
     
     with col3:
-        render_table_card("Anomalias de Preço (>30%)", anomalies_data)
-
+        if anomalies_data:
+            render_table_card("Anomalias de Preço (>30%)", anomalies_data)
+        else:
+            st.subheader("Anomalias de Preço (>30%)")
+            st.info("Nenhuma anomalia de preço encontrada nas últimas 24h.")
 else:
     st.warning("Não foi possível carregar os dados. Por favor, tente novamente mais tarde.")
