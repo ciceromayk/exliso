@@ -97,11 +97,14 @@ if coin_data:
     # Ordena os ganhadores e perdedores de forma segura, tratando valores nulos
     top_gainers = sorted(coin_data, key=lambda x: x.get('price_change_percentage_24h_in_currency') or -1000, reverse=True)[:10]
     top_losers = sorted(coin_data, key=lambda x: x.get('price_change_percentage_24h_in_currency') or 1000, reverse=False)[:10]
-    
+
+    # Ordena por capitalização de mercado (desc) e pega os 10 ultimos
+    new_listings = sorted(coin_data, key=lambda x: x.get('market_cap') or 0, reverse=False)[:10]
+
     anomalies_data = [coin for coin in coin_data if isinstance(coin.get('price_change_percentage_24h_in_currency'), (float, int)) and coin.get('price_change_percentage_24h_in_currency') > 30]
 
     # Renderiza em colunas
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
         render_table_card("Moedas Principais (20+)", top_20_coins)
@@ -111,8 +114,11 @@ if coin_data:
     
     with col3:
         render_table_card("Top Perdedores", top_losers)
-
+    
     with col4:
+        render_table_card("Novas Listagens Recentes", new_listings)
+
+    with col5:
         if anomalies_data:
             render_table_card("Anomalias de Preço (>30%)", anomalies_data)
         else:
