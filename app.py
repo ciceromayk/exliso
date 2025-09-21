@@ -22,7 +22,7 @@ def fetch_coin_data(retries=3):
     params = {
         'vs_currency': 'brl',
         'order': 'market_cap_desc',
-        'per_page': 250,
+        'per_page': 250, # Aumentei o limite para capturar mais moedas com variação
         'page': 1,
         'sparkline': False,
         'price_change_percentage': '24h'
@@ -83,13 +83,22 @@ with st.spinner("Carregando dados do CoinGecko..."):
 st.write("---")
 
 if coin_data:
-    # 20 Moedas Principais por Capitalização
-    render_table_card("20 Moedas Principais por Capitalização", coin_data[:20])
-
-    st.write("---")
-
-    # Moedas com Ganhos Anormais (>30%)
+    # Filtra os dados
+    top_20_coins = coin_data[:20]
+    top_gainers = sorted(coin_data, key=lambda x: x.get('price_change_percentage_24h_in_currency', -1000), reverse=True)[:10]
     anomalies_data = [coin for coin in coin_data if isinstance(coin.get('price_change_percentage_24h_in_currency'), (float, int)) and coin.get('price_change_percentage_24h_in_currency') > 30]
-    render_table_card("Anormalidades de Preço (>30%)", anomalies_data)
+
+    # Renderiza em colunas
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        render_table_card("Moedas Principais (20+)", top_20_coins)
+    
+    with col2:
+        render_table_card("Top Ganhadores", top_gainers)
+    
+    with col3:
+        render_table_card("Anomalias de Preço (>30%)", anomalies_data)
+
 else:
     st.warning("Não foi possível carregar os dados. Por favor, tente novamente mais tarde.")
